@@ -42,6 +42,14 @@ inputs:
     description: "The secret value from your GITHUB_TOKEN or another token to access the GitHub API. Defaults to the token at `github.token`"
     required: true
     default: ${{ github.token }}
+  enforcedSectionVersion:
+    description: |
+      "Optional. The specific changelog section (version) that must be updated in the changelog. 
+      For example, setting this to 'Unreleased' will enforce that the 'Unreleased' section in the changelog was modified.
+      Setting this to a specific version like 'v1.0.0' will enforce that section's modification.
+      When set, the changelog file must be modified AND the specified section must contain changes in the diff."
+    required: false
+    default: ''
 runs:
   using: 'node20'
   main: 'dist/index.js'
