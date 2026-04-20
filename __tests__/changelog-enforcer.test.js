@@ -31,6 +31,7 @@ describe('the changelog-enforcer', () => {
     inputs['expectedLatestVersion'] = ''
     inputs['versionPattern'] = VERSION_PATTERN
     inputs['token'] = 'token'
+    inputs['enforcedSectionVersion'] = ''
 
     jest.spyOn(core, 'getInput').mockImplementation((name) => {
       return inputs[name]
@@ -50,7 +51,7 @@ describe('the changelog-enforcer', () => {
   it('should skip enforcing when label is present', (done) => {
     changelogEnforcer.enforce()
       .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(5)
+        expect(infoSpy).toHaveBeenCalledTimes(6)
         expect(failureSpy).not.toHaveBeenCalled()
         expect(outputSpy).not.toHaveBeenCalled()
 
@@ -88,7 +89,7 @@ describe('the changelog-enforcer', () => {
 
     changelogEnforcer.enforce()
       .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(5)
+        expect(infoSpy).toHaveBeenCalledTimes(6)
         expect(failureSpy).not.toHaveBeenCalled()
         expect(outputSpy).not.toHaveBeenCalled()
 
@@ -116,7 +117,7 @@ describe('the changelog-enforcer', () => {
 
     changelogEnforcer.enforce()
       .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(5)
+        expect(infoSpy).toHaveBeenCalledTimes(6)
         expect(failureSpy).toHaveBeenCalled()
         expect(outputSpy).toHaveBeenCalled()
 
@@ -145,7 +146,7 @@ describe('the changelog-enforcer', () => {
 
     changelogEnforcer.enforce()
       .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(5)
+        expect(infoSpy).toHaveBeenCalledTimes(6)
         expect(failureSpy).toHaveBeenCalled()
         expect(outputSpy).toHaveBeenCalledWith('errorMessage', customErrorMessage)
 
@@ -182,7 +183,7 @@ describe('the changelog-enforcer', () => {
 
     changelogEnforcer.enforce()
       .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(5)
+        expect(infoSpy).toHaveBeenCalledTimes(6)
         expect(failureSpy).toHaveBeenCalled()
         expect(outputSpy).toHaveBeenCalled()
 
@@ -219,7 +220,7 @@ describe('the changelog-enforcer', () => {
 
     changelogEnforcer.enforce()
       .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(5)
+        expect(infoSpy).toHaveBeenCalledTimes(6)
         expect(failureSpy).not.toHaveBeenCalled()
         expect(outputSpy).not.toHaveBeenCalled()
 

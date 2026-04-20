@@ -3,7 +3,8 @@ const github = require('@actions/github')
 const versionExtractor = require('./version-extractor')
 const labelExtractor = require('./label-extractor')
 const contextExtractor = require('./context-extractor')
-const { findChangelog, downloadChangelog } = require('./client')
+const sectionExtractor = require('./section-extractor')
+const { findChangelog, downloadChangelog, downloadFileDiff } = require('./client')
 
 // Input keys
 const IN_CHANGELOG_PATH = 'changeLogPath'
@@ -12,6 +13,7 @@ const IN_VERSION_PATTERN = 'versionPattern'
 const IN_UPDATE_CUSTOM_ERROR = 'missingUpdateErrorMessage'
 const IN_SKIP_LABELS = 'skipLabels'
 const IN_TOKEN = "token"
+const IN_ENFORCED_SECTION_VERSION = 'enforcedSectionVersion'
 
 // Output keys
 const OUT_ERROR_MESSAGE = 'errorMessage'
@@ -24,12 +26,14 @@ module.exports.enforce = async function () {
         const expectedLatestVersion = core.getInput(IN_EXPECTED_LATEST_VERSION)
         const versionPattern = core.getInput(IN_VERSION_PATTERN)
         const token = getToken()
+        const enforcedSectionVersion = core.getInput(IN_ENFORCED_SECTION_VERSION)
 
         core.info(`Skip Labels: ${skipLabelList}`)
         core.info(`Changelog Path: ${changeLogPath}`)
         core.info(`Missing Update Error Message: ${missingUpdateErrorMessage}`)
         core.info(`Expected Latest Version: ${expectedLatestVersion}`)
         core.info(`Version Pattern: ${versionPattern}`)
+        core.info(`Enforced Section Version: ${enforcedSectionVersion}`)
 
         const context = github.context
         const pullRequest = contextExtractor.getPullRequestContext(context)
@@ -43,10 +47,15 @@ module.exports.enforce = async function () {
             return
         }
         const changelog = await checkChangeLog(token, repository, pullRequest.number, changeLogPath, missingUpdateErrorMessage)
-        if (shouldEnforceVersion(expectedLatestVersion)) {
-            return
+
+        // Check enforced section if specified
+        if (enforcedSectionVersion !== '') {
+            await validateSectionModified(token, repository, pullRequest.number, changeLogPath, versionPattern, enforcedSectionVersion)
         }
-        await validateLatestVersion(token, expectedLatestVersion, versionPattern, changelog.contents_url)
+
+        if (shouldEnforceVersion(expectedLatestVersion)) {
+            await validateLatestVersion(token, expectedLatestVersion, versionPattern, changelog.contents_url)
+        }
     } catch (err) {
         core.setOutput(OUT_ERROR_MESSAGE, err.message)
         core.setFailed(err.message)
@@ -79,7 +88,7 @@ function shouldEnforceChangelog(labelNames, skipLabelList) {
 }
 
 function shouldEnforceVersion(expectedLatestVersion) {
-    return expectedLatestVersion === ''
+    return expectedLatestVersion !== ''
 }
 
 function normalizeChangelogPath(changeLogPath) {
@@ -112,5 +121,17 @@ async function validateLatestVersion(token, expectedLatestVersion, versionPatter
     }
     if (latest !== expectedLatestVersion) {
         throw new Error(`The latest version in the changelog does not match the expected latest version of ${expectedLatestVersion}!`)
+    }
+}
+
+async function validateSectionModified(token, repository, pullRequestNumber, changeLogPath, versionPattern, enforcedSectionVersion) {
+    const diff = await downloadFileDiff(token, repository, pullRequestNumber, changeLogPath)
+    if (!diff) {
+        throw new Error(`Unable to retrieve diff for ${changeLogPath}`)
+    }
+
+    const isModified = sectionExtractor.isSectionModified(versionPattern, enforcedSectionVersion, diff)
+    if (!isModified) {
+        throw new Error(`The "${enforcedSectionVersion}" section in ${changeLogPath} was not modified!`)
     }
 }
