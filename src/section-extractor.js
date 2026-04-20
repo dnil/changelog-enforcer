@@ -21,7 +21,7 @@ module.exports.extractSection = function (versionPattern, sectionVersion, change
     // 2. Everything until the next version header (using negative lookahead)
     const sectionPattern = new RegExp(
         `^## \\[${escapedVersion}\\].*$(?:\\n(?!## \\[).*)*`,
-        'm'
+        'mi'
     )
 
     const match = changelog.match(sectionPattern)
@@ -49,9 +49,9 @@ module.exports.isSectionModified = function (versionPattern, sectionVersion, dif
 
     // Pattern to find the section header in the diff
     // This pattern matches lines that might have +/- prefix and contain ## [version]
-    const sectionHeaderPattern = new RegExp(`[+-]?\\s*## \\[${escapedVersion}\\]`)
+    const sectionHeaderPattern = new RegExp(`[+-]?\\s*## \\[${escapedVersion}\\]`, 'i')
     // Pattern to match start of a line (no ^ since we split by newline)
-    const sectionStartPattern = new RegExp(`[+-]?\\s*## \\[${escapedVersion}\\]`)
+    const sectionStartPattern = new RegExp(`[+-]?\\s*## \\[${escapedVersion}\\]`, 'i')
 
     // Check if the section header exists in the diff
     if (!sectionHeaderPattern.test(diff)) {
@@ -76,7 +76,7 @@ module.exports.isSectionModified = function (versionPattern, sectionVersion, dif
 
         // Check if we're leaving the section (hitting another section header)
         // Match any ## [ pattern but not the target section
-        if (inSection && /^[+-]?\s*## \[/.test(line) && !sectionStartPattern.test(line)) {
+        if (inSection && /^[+-]?\s*## \[/i.test(line) && !sectionStartPattern.test(line)) {
             core.debug(`Exiting section: ${sectionVersion}`)
             break
         }
