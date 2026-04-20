@@ -229,4 +229,90 @@ describe('the changelog-enforcer', () => {
         done()
       })
   })
+
+  it('should enforce section when enforcedSectionVersion is set and section is modified', (done) => {
+    inputs['skipLabels'] = 'A different label'
+    inputs['enforcedSectionVersion'] = 'unreleased'
+
+    const files = [
+      {
+        "filename": "CHANGELOG.md",
+        "status": "modified",
+        "contents_url": "./path/to/CHANGELOG.md",
+        "patch": "patch-url"
+      }
+    ]
+
+    const diff = `diff --git a/CHANGELOG.md b/CHANGELOG.md
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,3 +1,5 @@
+ ## [Unreleased]
++
++- Added new feature
++
+ ## [v1.0.0]
+ - Initial release`
+
+    fetch.mockImplementation((url, options) => {
+      if (url === 'patch-url') {
+        return Promise.resolve(new Response(diff))
+      }
+      return prepareResponse(JSON.stringify(files))
+    })
+
+    changelogEnforcer.enforce()
+      .then(() => {
+        expect(infoSpy).toHaveBeenCalledTimes(7) // 6 + 1 for enforced section
+        expect(failureSpy).not.toHaveBeenCalled()
+        expect(outputSpy).not.toHaveBeenCalled()
+
+        expect(fetch).toHaveBeenCalledTimes(2)
+
+        done()
+      })
+  })
+
+  it('should fail when enforcedSectionVersion is set and section is not modified', (done) => {
+    inputs['skipLabels'] = 'A different label'
+    inputs['enforcedSectionVersion'] = 'unreleased'
+
+    const files = [
+      {
+        "filename": "CHANGELOG.md",
+        "status": "modified",
+        "contents_url": "./path/to/CHANGELOG.md",
+        "patch": "patch-url"
+      }
+    ]
+
+    const diff = `diff --git a/CHANGELOG.md b/CHANGELOG.md
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,3 +1,5 @@
+ ## [Unreleased]
+ 
+ ## [v1.0.0]
++- Fixed bug
++
+ - Initial release`
+
+    fetch.mockImplementation((url, options) => {
+      if (url === 'patch-url') {
+        return Promise.resolve(new Response(diff))
+      }
+      return prepareResponse(JSON.stringify(files))
+    })
+
+    changelogEnforcer.enforce()
+      .then(() => {
+        expect(infoSpy).toHaveBeenCalledTimes(7)
+        expect(failureSpy).toHaveBeenCalled()
+        expect(outputSpy).toHaveBeenCalled()
+
+        expect(fetch).toHaveBeenCalledTimes(2)
+
+        done()
+      })
+  })
 })
