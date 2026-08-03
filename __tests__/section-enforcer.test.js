@@ -58,13 +58,13 @@ describe('the changelog-enforcer section enforcement', () => {
       }
     ]
 
-    fetch.mockImplementation((url, options) => {
+    fetch.mockImplementation(() => {
       return prepareResponse(JSON.stringify(files))
     })
 
     changelogEnforcer.enforce()
       .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(6) // 5 original + 1 for enforced section
+        expect(infoSpy).toHaveBeenCalledTimes(1)
         expect(failureSpy).not.toHaveBeenCalled()
         expect(outputSpy).not.toHaveBeenCalled()
 

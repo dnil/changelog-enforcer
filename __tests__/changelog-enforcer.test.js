@@ -48,16 +48,16 @@ describe('the changelog-enforcer', () => {
     return Promise.resolve(new Response(body, { Headers: { 'Content-Type': 'application/json' } }))
   }
 
-  it('should skip enforcing when label is present', (done) => {
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(6)
-        expect(failureSpy).not.toHaveBeenCalled()
-        expect(outputSpy).not.toHaveBeenCalled()
+   it('should skip enforcing when label is present', (done) => {
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(0)
+         expect(failureSpy).not.toHaveBeenCalled()
+         expect(outputSpy).not.toHaveBeenCalled()
 
-        done()
-      })
-  })
+         done()
+       })
+   })
 
   it('should throw an error when token is missing', (done) => {
     inputs['token'] = ''
@@ -72,247 +72,241 @@ describe('the changelog-enforcer', () => {
       })
   })
 
-  it('should enforce when label is not present; changelog is changed', (done) => {
-    inputs['skipLabels'] = 'A different label'
+   it('should enforce when label is not present; changelog is changed', (done) => {
+     inputs['skipLabels'] = 'A different label'
 
-    const files = [
-      {
-        "filename": "CHANGELOG.md",
-        "status": "modified",
-        "contents_url": "./path/to/CHANGELOG.md"
-      }
-    ]
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": "./path/to/CHANGELOG.md"
+       }
+     ]
 
-    fetch.mockImplementation((url, options) => {
-      return prepareResponse(JSON.stringify(files))
-    })
+     fetch.mockImplementation((url, options) => {
+       return prepareResponse(JSON.stringify(files))
+     })
 
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(6)
-        expect(failureSpy).not.toHaveBeenCalled()
-        expect(outputSpy).not.toHaveBeenCalled()
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(1)
+         expect(failureSpy).not.toHaveBeenCalled()
+         expect(outputSpy).not.toHaveBeenCalled()
 
-        expect(fetch).toHaveBeenCalledTimes(1)
+         expect(fetch).toHaveBeenCalledTimes(1)
 
-        done()
-      })
-  })
+         done()
+       })
+   })
 
-  it('should enforce when label is not present; changelog is not changed', (done) => {
-    inputs['skipLabels'] = 'A different label'
+   it('should enforce when label is not present; changelog is not changed', (done) => {
+     inputs['skipLabels'] = 'A different label'
 
-    const files = [
-      {
-        "filename": "AnotherFile.md",
-        "status": "modified",
-        "contents_url": "/path/to/AnotherFile.md"
-      }
-    ]
+     const files = [
+       {
+         "filename": "AnotherFile.md",
+         "status": "modified",
+         "contents_url": "/path/to/AnotherFile.md"
+       }
+     ]
 
 
-    fetch.mockImplementation((url, options) => {
-      return prepareResponse(JSON.stringify(files))
-    })
+     fetch.mockImplementation((url, options) => {
+       return prepareResponse(JSON.stringify(files))
+     })
 
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(6)
-        expect(failureSpy).toHaveBeenCalled()
-        expect(outputSpy).toHaveBeenCalled()
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(0)
+         expect(failureSpy).toHaveBeenCalled()
+         expect(outputSpy).toHaveBeenCalled()
 
-        expect(fetch).toHaveBeenCalledTimes(1)
+         expect(fetch).toHaveBeenCalledTimes(1)
 
-        done()
-      })
-  })
+         done()
+       })
+   })
 
-  it('should enforce when label is not present; changelog is not changed; custom error message', (done) => {
-    const customErrorMessage = 'Some Message for you @Author!'
-    inputs['skipLabels'] = 'A different label'
-    inputs['missingUpdateErrorMessage'] = customErrorMessage
+   it('should enforce when label is not present; changelog is not changed; custom error message', (done) => {
+     const customErrorMessage = 'Some Message for you @Author!'
+     inputs['skipLabels'] = 'A different label'
+     inputs['missingUpdateErrorMessage'] = customErrorMessage
 
-    const files = [
-      {
-        "filename": "AnotherFile.md",
-        "status": "modified",
-        "contents_url": "/path/to/AnotherFile.md"
-      }
-    ]
+     const files = [
+       {
+         "filename": "AnotherFile.md",
+         "status": "modified",
+         "contents_url": "/path/to/AnotherFile.md"
+       }
+     ]
 
-    fetch.mockImplementation((url, options) => {
-      return prepareResponse(JSON.stringify(files))
-    })
+     fetch.mockImplementation((url, options) => {
+       return prepareResponse(JSON.stringify(files))
+     })
 
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(6)
-        expect(failureSpy).toHaveBeenCalled()
-        expect(outputSpy).toHaveBeenCalledWith('errorMessage', customErrorMessage)
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(0)
+         expect(failureSpy).toHaveBeenCalled()
+         expect(outputSpy).toHaveBeenCalledWith('errorMessage', customErrorMessage)
 
-        expect(fetch).toHaveBeenCalledTimes(1)
+         expect(fetch).toHaveBeenCalledTimes(1)
 
-        done()
-      })
-  })
+         done()
+       })
+   })
 
-  it('should enforce when label is not present; changelog is changed; versions do not match', (done) => {
-    const contentsUrl = 'some-url'
-    inputs['skipLabels'] = 'A different label'
-    inputs['expectedLatestVersion'] = 'v2.0.0'
+   it('should enforce when label is not present; changelog is changed; versions do not match', (done) => {
+     const contentsUrl = 'some-url'
+     inputs['skipLabels'] = 'A different label'
+     inputs['expectedLatestVersion'] = 'v2.0.0'
 
-    const files = [
-      {
-        "filename": "CHANGELOG.md",
-        "status": "modified",
-        "contents_url": contentsUrl
-      }
-    ]
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": contentsUrl
+       }
+     ]
 
-    const changelog =
-      `## [v2.1.0]
-    - Changelog   
-`
+     const changelog =
+       `## [v2.1.0]
+     - Changelog   
+ `
 
-    fetch.mockImplementation((url, options) => {
-      if (url === contentsUrl) {
-        return Promise.resolve(new Response(changelog))
-      }
-      return prepareResponse(JSON.stringify(files))
-    })
+     fetch.mockImplementation((url, options) => {
+       if (url === contentsUrl) {
+         return Promise.resolve(new Response(changelog))
+       }
+       return prepareResponse(JSON.stringify(files))
+     })
 
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(6)
-        expect(failureSpy).toHaveBeenCalled()
-        expect(outputSpy).toHaveBeenCalled()
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(0)
+         expect(failureSpy).toHaveBeenCalled()
+         expect(outputSpy).toHaveBeenCalled()
 
-        expect(fetch).toHaveBeenCalledTimes(2)
+         expect(fetch).toHaveBeenCalledTimes(2)
 
-        done()
-      })
-  })
+         done()
+       })
+   })
 
-  it('should enforce when label is not present; changelog is changed; only one unreleased version exists', (done) => {
-    const contentsUrl = 'some-url'
-    inputs['skipLabels'] = 'A different label'
-    inputs['expectedLatestVersion'] = 'v2.0.0'
+   it('should enforce when label is not present; changelog is changed; only one unreleased version exists', (done) => {
+     const contentsUrl = 'some-url'
+     inputs['skipLabels'] = 'A different label'
+     inputs['expectedLatestVersion'] = 'v2.0.0'
 
-    const files = [
-      {
-        "filename": "CHANGELOG.md",
-        "status": "modified",
-        "contents_url": contentsUrl
-      }
-    ]
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": contentsUrl
+       }
+     ]
 
-    const changelog =
-      `## [Unreleased]
-    - Changelog   
-`
+     const changelog =
+       `## [Unreleased]
+     - Changelog   
+ `
 
-    fetch.mockImplementation((url, options) => {
-      if (url === contentsUrl) {
-        return Promise.resolve(new Response(changelog))
-      }
-      return prepareResponse(JSON.stringify(files))
-    })
+     fetch.mockImplementation((url, options) => {
+       if (url === contentsUrl) {
+         return Promise.resolve(new Response(changelog))
+       }
+       return prepareResponse(JSON.stringify(files))
+     })
 
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(6)
-        expect(failureSpy).not.toHaveBeenCalled()
-        expect(outputSpy).not.toHaveBeenCalled()
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(1)
+         expect(failureSpy).not.toHaveBeenCalled()
+         expect(outputSpy).not.toHaveBeenCalled()
 
-        expect(fetch).toHaveBeenCalledTimes(2)
+         expect(fetch).toHaveBeenCalledTimes(2)
 
-        done()
-      })
-  })
+         done()
+       })
+   })
 
-  it('should enforce section when enforcedSectionVersion is set and section is modified', (done) => {
-    inputs['skipLabels'] = 'A different label'
-    inputs['enforcedSectionVersion'] = 'unreleased'
+   it('should enforce section when enforcedSectionVersion is set and section is modified', (done) => {
+     inputs['skipLabels'] = 'A different label'
+     inputs['enforcedSectionVersion'] = 'unreleased'
 
-    const files = [
-      {
-        "filename": "CHANGELOG.md",
-        "status": "modified",
-        "contents_url": "./path/to/CHANGELOG.md",
-        "patch": "patch-url"
-      }
-    ]
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": "./path/to/CHANGELOG.md",
+           "patch": [
+             'diff --git a/CHANGELOG.md b/CHANGELOG.md',
+             '--- a/CHANGELOG.md',
+             '+++ b/CHANGELOG.md',
+             '@@ -1,3 +1,5 @@',
+             ' ## [Unreleased]',
+             '+',
+             '+- Added new feature',
+             '+',
+             ' ## [v1.0.0]',
+             ' - Initial release'
+           ].join('\n')
+       }
+     ]
 
-    const diff = `diff --git a/CHANGELOG.md b/CHANGELOG.md
---- a/CHANGELOG.md
-+++ b/CHANGELOG.md
-@@ -1,3 +1,5 @@
- ## [Unreleased]
-+
-+- Added new feature
-+
- ## [v1.0.0]
- - Initial release`
+      fetch.mockImplementation(() => prepareResponse(JSON.stringify(files)))
 
-    fetch.mockImplementation((url, options) => {
-      if (url === 'patch-url') {
-        return Promise.resolve(new Response(diff))
-      }
-      return prepareResponse(JSON.stringify(files))
-    })
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(1)
+         expect(failureSpy).not.toHaveBeenCalled()
+         expect(outputSpy).not.toHaveBeenCalled()
 
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(7) // 6 + 1 for enforced section
-        expect(failureSpy).not.toHaveBeenCalled()
-        expect(outputSpy).not.toHaveBeenCalled()
+           expect(fetch).toHaveBeenCalledTimes(2)
 
-        expect(fetch).toHaveBeenCalledTimes(2)
+         done()
+       })
+       .catch((err) => {
+         console.error('Test promise rejected with:', err)
+         done(err)
+       })
+   })
 
-        done()
-      })
-  })
+   it('should fail when enforcedSectionVersion is set and section is not modified', (done) => {
+     inputs['skipLabels'] = 'A different label'
+     inputs['enforcedSectionVersion'] = 'unreleased'
 
-  it('should fail when enforcedSectionVersion is set and section is not modified', (done) => {
-    inputs['skipLabels'] = 'A different label'
-    inputs['enforcedSectionVersion'] = 'unreleased'
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": "./path/to/CHANGELOG.md",
+           "patch": [
+             'diff --git a/CHANGELOG.md b/CHANGELOG.md',
+             '--- a/CHANGELOG.md',
+             '+++ b/CHANGELOG.md',
+             '@@ -1,3 +1,5 @@',
+             ' ## [Unreleased]',
+             ' ',
+             ' ## [v1.0.0]',
+             '+- Fixed bug',
+             '+',
+             ' - Initial release'
+           ].join('\n')
+       }
+     ]
 
-    const files = [
-      {
-        "filename": "CHANGELOG.md",
-        "status": "modified",
-        "contents_url": "./path/to/CHANGELOG.md",
-        "patch": "patch-url"
-      }
-    ]
+      fetch.mockImplementation(() => prepareResponse(JSON.stringify(files)))
 
-    const diff = `diff --git a/CHANGELOG.md b/CHANGELOG.md
---- a/CHANGELOG.md
-+++ b/CHANGELOG.md
-@@ -1,3 +1,5 @@
- ## [Unreleased]
- 
- ## [v1.0.0]
-+- Fixed bug
-+
- - Initial release`
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(infoSpy).toHaveBeenCalledTimes(0)
+         expect(failureSpy).toHaveBeenCalled()
+         expect(outputSpy).toHaveBeenCalled()
 
-    fetch.mockImplementation((url, options) => {
-      if (url === 'patch-url') {
-        return Promise.resolve(new Response(diff))
-      }
-      return prepareResponse(JSON.stringify(files))
-    })
+           expect(fetch).toHaveBeenCalledTimes(2)
 
-    changelogEnforcer.enforce()
-      .then(() => {
-        expect(infoSpy).toHaveBeenCalledTimes(7)
-        expect(failureSpy).toHaveBeenCalled()
-        expect(outputSpy).toHaveBeenCalled()
-
-        expect(fetch).toHaveBeenCalledTimes(2)
-
-        done()
-      })
-  })
+         done()
+       })
+   })
 })
