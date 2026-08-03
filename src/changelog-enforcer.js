@@ -28,12 +28,13 @@ module.exports.enforce = async function () {
         const token = getToken()
         const enforcedSectionVersion = core.getInput(IN_ENFORCED_SECTION_VERSION)
 
-        core.info(`Skip Labels: ${skipLabelList}`)
-        core.info(`Changelog Path: ${changeLogPath}`)
-        core.info(`Missing Update Error Message: ${missingUpdateErrorMessage}`)
-        core.info(`Expected Latest Version: ${expectedLatestVersion}`)
-        core.info(`Version Pattern: ${versionPattern}`)
-        core.info(`Enforced Section Version: ${enforcedSectionVersion}`)
+        core.debug(`Skip Labels: ${skipLabelList}`)
+        core.debug(`Changelog Path: ${changeLogPath}`)
+        core.debug(`Expected Latest Version: ${expectedLatestVersion}`)
+        core.debug(`Version Pattern: ${versionPattern}`)
+        core.debug(`Enforced Section Version: ${enforcedSectionVersion}`)
+
+        core.debug(`Missing Update Error Message: ${missingUpdateErrorMessage}`)
 
         const context = github.context
         const pullRequest = contextExtractor.getPullRequestContext(context)
@@ -56,6 +57,8 @@ module.exports.enforce = async function () {
         if (shouldEnforceVersion(expectedLatestVersion)) {
             await validateLatestVersion(token, expectedLatestVersion, versionPattern, changelog.contents_url)
         }
+
+        core.info('✅ Changelog section updated')
     } catch (err) {
         core.setOutput(OUT_ERROR_MESSAGE, err.message)
         core.setFailed(err.message)
