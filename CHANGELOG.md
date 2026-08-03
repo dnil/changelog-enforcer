@@ -4,6 +4,9 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [UNRELEASED]
 
+### Added
+- Added an `enforcedSectionVersion` input parameter to allow enforcement of a specific section in the changelog file (e.g., "Unreleased" or "v1.0.0")
+
 ## [v3.7.0]
 
 ### Changed

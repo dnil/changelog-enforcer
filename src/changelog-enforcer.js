@@ -125,7 +125,8 @@ async function validateLatestVersion(token, expectedLatestVersion, versionPatter
 }
 
 async function validateSectionModified(token, repository, pullRequestNumber, changeLogPath, versionPattern, enforcedSectionVersion) {
-    const diff = await downloadFileDiff(token, repository, pullRequestNumber, changeLogPath)
+    const normalizedChangeLogPath = normalizeChangelogPath(changeLogPath)
+    const diff = await downloadFileDiff(token, repository, pullRequestNumber, normalizedChangeLogPath)
     if (!diff) {
         throw new Error(`Unable to retrieve diff for ${changeLogPath}`)
     }

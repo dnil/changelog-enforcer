@@ -68,4 +68,33 @@ describe('the client', () => {
       expect(fetch).toHaveBeenCalled()
     }
   })
+
+  it('should return changelog patch from pull request file payload', async () => {
+    const files = [
+      {
+        "filename": "CHANGELOG.md",
+        "status": "modified",
+        "patch": "@@ -1,2 +1,3 @@\n ## [Unreleased]\n+- Added feature"
+      }
+    ]
+
+    fetch.mockReturnValueOnce(prepareResponse(JSON.stringify(files)))
+
+    const diff = await client.downloadFileDiff('token', 'repo', 1, 'CHANGELOG.md')
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(diff).toBe(files[0].patch)
+  })
+
+  it('should throw when changelog file has no patch in payload', async () => {
+    const files = [
+      {
+        "filename": "CHANGELOG.md",
+        "status": "modified"
+      }
+    ]
+
+    fetch.mockReturnValueOnce(prepareResponse(JSON.stringify(files)))
+
+    await expect(client.downloadFileDiff('token', 'repo', 1, 'CHANGELOG.md')).rejects.toThrow('No patch found for CHANGELOG.md')
+  })
 })
