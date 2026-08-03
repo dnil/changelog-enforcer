@@ -67,21 +67,12 @@ module.exports.downloadFileDiff = async function (token, repository, pullRequest
             .filter(f => f.filename === changeLogPath)
 
         if (filtered.length == 1) {
-            // Download the patch for the specific file
             const fileInfo = filtered[0]
             if (!fileInfo.patch) {
-                throw new Error(`No patch URL found for ${changeLogPath}`)
+                throw new Error(`No patch found for ${changeLogPath}`)
             }
-            core.debug(`Downloading patch from ${fileInfo.patch}`)
-            const patchOptions = addAuth(token, {})
-            const patchResponse = await fetch(`${fileInfo.patch}`, patchOptions)
-            if (!patchResponse.ok) {
-                throw new Error(`Got a ${patchResponse.status} response from GitHub API when downloading patch`)
-            }
-            const patch = await patchResponse.text()
-            // URL decode the patch content - GitHub returns diffs with URL-encoded newlines
-            const decodedPatch = patch.replace(/%0A/g, '\n').replace(/%0D/g, '\r')
-            return decodedPatch
+            // GitHub's pulls/:number/files API already includes patch text inline.
+            return fileInfo.patch
         } else if (files.length < pageSize) {
             complete = true
         } else {
