@@ -34018,6 +34018,14 @@ async function validateSectionModified(token, repository, pullRequestNumber, cha
         throw new Error(`Unable to retrieve diff for ${changeLogPath}`)
     }
 
+    // If the enforced section header was removed/renamed in this diff (e.g. "Unreleased" → "v1.2.0"),
+    // treat it as a release/hotfix branch and skip the section check.
+    // The changelog file being modified is already confirmed by checkChangeLog.
+    if (sectionExtractor.isSectionBeingRenamed(enforcedSectionVersion, diff)) {
+        core.info(`Section "${enforcedSectionVersion}" appears to have been renamed — assuming release/hotfix branch. Skipping section check.`)
+        return
+    }
+
     const isModified = sectionExtractor.isSectionModified(versionPattern, enforcedSectionVersion, diff)
     if (!isModified) {
         throw new Error(`The "${enforcedSectionVersion}" section in ${changeLogPath} was not modified!`)
@@ -34212,6 +34220,23 @@ module.exports.extractSection = function (versionPattern, sectionVersion, change
 
     core.debug(`Section not found for version: ${sectionVersion}`)
     return null
+}
+
+/**
+ * Checks if a specific section header is being renamed/removed in the diff (release/hotfix branch scenario).
+ * Returns true if the header appears ONLY as a removed line ('-' prefix) and not as a context
+ * or added line, which indicates the section was renamed (e.g., "Unreleased" → "v1.2.0").
+ * In that case callers should skip the section-modification check.
+ *
+ * @param {string} sectionVersion - The version/section to look for
+ * @param {string} diff - The diff content
+ * @returns {boolean} True if the section header is being removed/renamed
+ */
+module.exports.isSectionBeingRenamed = function (sectionVersion, diff) {
+    const escapedVersion = sectionVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const removedPattern = new RegExp(`^-## \\[${escapedVersion}\\]`, 'im')
+    const presentPattern = new RegExp(`^[+ ]## \\[${escapedVersion}\\]`, 'im')
+    return removedPattern.test(diff) && !presentPattern.test(diff)
 }
 
 /**

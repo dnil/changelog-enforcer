@@ -35,6 +35,23 @@ module.exports.extractSection = function (versionPattern, sectionVersion, change
 }
 
 /**
+ * Checks if a specific section header is being renamed/removed in the diff (release/hotfix branch scenario).
+ * Returns true if the header appears ONLY as a removed line ('-' prefix) and not as a context
+ * or added line, which indicates the section was renamed (e.g., "Unreleased" → "v1.2.0").
+ * In that case callers should skip the section-modification check.
+ *
+ * @param {string} sectionVersion - The version/section to look for
+ * @param {string} diff - The diff content
+ * @returns {boolean} True if the section header is being removed/renamed
+ */
+module.exports.isSectionBeingRenamed = function (sectionVersion, diff) {
+    const escapedVersion = sectionVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const removedPattern = new RegExp(`^-## \\[${escapedVersion}\\]`, 'im')
+    const presentPattern = new RegExp(`^[+ ]## \\[${escapedVersion}\\]`, 'im')
+    return removedPattern.test(diff) && !presentPattern.test(diff)
+}
+
+/**
  * Checks if a specific section was modified in the changelog diff.
  * This function analyzes the diff (added/removed lines) to see if a specific section changed.
  *

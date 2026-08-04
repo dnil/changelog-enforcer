@@ -155,6 +155,55 @@ index 1234567..abcdefg 100644
     })
   })
 
+  describe('isSectionBeingRenamed', () => {
+    it('should return false when the section header is a context line (section still exists)', () => {
+      const diff = [
+        'diff --git a/CHANGELOG.md b/CHANGELOG.md',
+        '--- a/CHANGELOG.md',
+        '+++ b/CHANGELOG.md',
+        '@@ -1,3 +1,5 @@',
+        ' ## [Unreleased]',
+        '+- Added new feature',
+        ' ## [v1.0.0]',
+        ' - Initial release'
+      ].join('\n')
+      expect(sectionExtractor.isSectionBeingRenamed('Unreleased', diff)).toBe(false)
+    })
+
+    it('should return true when the section header is removed and replaced (release/hotfix branch)', () => {
+      const diff = [
+        'diff --git a/CHANGELOG.md b/CHANGELOG.md',
+        '--- a/CHANGELOG.md',
+        '+++ b/CHANGELOG.md',
+        '@@ -1,3 +1,5 @@',
+        '-## [Unreleased]',
+        '+## [v1.2.0] - 2026-08-04',
+        '+- New feature',
+        ' ## [v1.0.0]',
+        ' - Initial release'
+      ].join('\n')
+      expect(sectionExtractor.isSectionBeingRenamed('unreleased', diff)).toBe(true)
+    })
+
+    it('should return false when the section header is not in the diff at all', () => {
+      const diff = [
+        'diff --git a/CHANGELOG.md b/CHANGELOG.md',
+        '--- a/CHANGELOG.md',
+        '+++ b/CHANGELOG.md',
+        '@@ -5,3 +5,5 @@',
+        ' ## [v1.0.0]',
+        '+- Fixed bug',
+        ' - Initial release'
+      ].join('\n')
+      expect(sectionExtractor.isSectionBeingRenamed('unreleased', diff)).toBe(false)
+    })
+
+    it('should be case-insensitive when detecting removal', () => {
+      const diff = '-## [UNRELEASED]\n+## [v2.0.0] - 2026-08-04'
+      expect(sectionExtractor.isSectionBeingRenamed('unreleased', diff)).toBe(true)
+    })
+  })
+
   describe('extractSection', () => {
     it('should extract Unreleased section content', () => {
       const changelog = `## [Unreleased]

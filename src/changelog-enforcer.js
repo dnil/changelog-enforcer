@@ -134,6 +134,14 @@ async function validateSectionModified(token, repository, pullRequestNumber, cha
         throw new Error(`Unable to retrieve diff for ${changeLogPath}`)
     }
 
+    // If the enforced section header was removed/renamed in this diff (e.g. "Unreleased" → "v1.2.0"),
+    // treat it as a release/hotfix branch and skip the section check.
+    // The changelog file being modified is already confirmed by checkChangeLog.
+    if (sectionExtractor.isSectionBeingRenamed(enforcedSectionVersion, diff)) {
+        core.info(`Section "${enforcedSectionVersion}" appears to have been renamed — assuming release/hotfix branch. Skipping section check.`)
+        return
+    }
+
     const isModified = sectionExtractor.isSectionModified(versionPattern, enforcedSectionVersion, diff)
     if (!isModified) {
         throw new Error(`The "${enforcedSectionVersion}" section in ${changeLogPath} was not modified!`)

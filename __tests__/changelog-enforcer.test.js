@@ -272,6 +272,49 @@ describe('the changelog-enforcer', () => {
        })
    })
 
+   it('should skip section check when enforcedSectionVersion is not present in diff (release/hotfix branch)', (done) => {
+     inputs['skipLabels'] = 'A different label'
+     inputs['enforcedSectionVersion'] = 'unreleased'
+
+     // Simulates a release branch: "Unreleased" was renamed to a numbered version
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": "./path/to/CHANGELOG.md",
+         "patch": [
+           'diff --git a/CHANGELOG.md b/CHANGELOG.md',
+           '--- a/CHANGELOG.md',
+           '+++ b/CHANGELOG.md',
+           '@@ -1,3 +1,5 @@',
+           '-## [Unreleased]',
+           '+## [v1.2.0] - 2026-08-04',
+           '+- New feature',
+           ' ## [v1.0.0]',
+           ' - Initial release'
+         ].join('\n')
+       }
+     ]
+
+     fetch.mockImplementation(() => prepareResponse(JSON.stringify(files)))
+
+     changelogEnforcer.enforce()
+       .then(() => {
+         // 1 info call: the fallback notice
+         expect(infoSpy).toHaveBeenCalledTimes(2)
+         expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('appears to have been renamed'))
+         expect(failureSpy).not.toHaveBeenCalled()
+         expect(outputSpy).not.toHaveBeenCalled()
+
+         expect(fetch).toHaveBeenCalledTimes(2)
+
+         done()
+       })
+       .catch((err) => {
+         done(err)
+       })
+   })
+
    it('should fail when enforcedSectionVersion is set and section is not modified', (done) => {
      inputs['skipLabels'] = 'A different label'
      inputs['enforcedSectionVersion'] = 'unreleased'
