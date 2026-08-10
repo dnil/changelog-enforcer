@@ -204,6 +204,122 @@ index 1234567..abcdefg 100644
     })
   })
 
+  describe('findSectionLineRange', () => {
+    it('should return start and end for the first section', () => {
+      const content = `## [Unreleased]
+- New feature
+
+## [v1.0.0]
+- Initial release
+`
+      const range = sectionExtractor.findSectionLineRange(versionPattern, 'Unreleased', content)
+      expect(range).not.toBeNull()
+      expect(range.start).toBe(1)
+      expect(range.end).toBe(4) // line 4 is "## [v1.0.0]"
+    })
+
+    it('should return start and end for a middle section', () => {
+      const content = `## [v2.0.0]
+- New feature
+
+## [v1.0.0]
+- Initial release
+
+## [v0.9.0]
+- Pre-release
+`
+      const range = sectionExtractor.findSectionLineRange(versionPattern, 'v1.0.0', content)
+      expect(range).not.toBeNull()
+      expect(range.start).toBe(4) // line 4 is "## [v1.0.0]"
+      expect(range.end).toBe(7) // line 7 is "## [v0.9.0]"
+    })
+
+    it('should return start and EOF for the last section', () => {
+      const content = `## [Unreleased]
+- New feature
+
+## [v1.0.0]
+- Initial release
+`
+      const range = sectionExtractor.findSectionLineRange(versionPattern, 'v1.0.0', content)
+      expect(range).not.toBeNull()
+      expect(range.start).toBe(4)
+      // end should be past last line
+      const lineCount = content.split('\n').length
+      expect(range.end).toBe(lineCount + 1)
+    })
+
+    it('should return null when section not found', () => {
+      const content = `## [v1.0.0]
+- Initial release
+`
+      const range = sectionExtractor.findSectionLineRange(versionPattern, 'v2.0.0', content)
+      expect(range).toBeNull()
+    })
+
+    it('should be case-insensitive', () => {
+      const content = `## [UNRELEASED]
+- New feature
+
+## [v1.0.0]
+- Initial release
+`
+      const range = sectionExtractor.findSectionLineRange(versionPattern, 'unreleased', content)
+      expect(range).not.toBeNull()
+      expect(range.start).toBe(1)
+    })
+  })
+
+  describe('getAddedLineNumbers', () => {
+    it('should return added line numbers from a single hunk', () => {
+      const patch = `@@ -1,3 +1,5 @@
+ ## [Unreleased]
++- New feature A
++- New feature B
+ ## [v1.0.0]`
+      const added = sectionExtractor.getAddedLineNumbers(patch)
+      expect(added.has(2)).toBe(true) // line 2 in new file
+      expect(added.has(3)).toBe(true) // line 3 in new file
+      expect(added.size).toBe(2)
+    })
+
+    it('should handle multiple hunks', () => {
+      const patch = `@@ -1,3 +1,4 @@
+ ## [Unreleased]
++- New feature
+ ## [v1.0.0]
+@@ -10,3 +11,4 @@
+ Some context
++- Another change
+ More context`
+      const added = sectionExtractor.getAddedLineNumbers(patch)
+      expect(added.has(2)).toBe(true)  // first hunk addition
+      expect(added.has(12)).toBe(true) // second hunk addition
+    })
+
+    it('should not count removed lines', () => {
+      const patch = `@@ -1,4 +1,3 @@
+ ## [Unreleased]
+-- Old line
+ ## [v1.0.0]`
+      const added = sectionExtractor.getAddedLineNumbers(patch)
+      expect(added.size).toBe(0)
+    })
+
+    it('should handle patch with diff headers', () => {
+      const patch = `diff --git a/CHANGELOG.md b/CHANGELOG.md
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,3 +1,4 @@
+ ## [Unreleased]
++- New feature
+ ## [v1.0.0]`
+      const added = sectionExtractor.getAddedLineNumbers(patch)
+      expect(added.has(2)).toBe(true)
+      expect(added.size).toBe(1)
+    })
+  })
+
   describe('extractSection', () => {
     it('should extract Unreleased section content', () => {
       const changelog = `## [Unreleased]

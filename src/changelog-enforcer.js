@@ -51,7 +51,7 @@ module.exports.enforce = async function () {
 
         // Check enforced section if specified
         if (enforcedSectionVersion !== '') {
-            await validateSectionModified(token, repository, pullRequest.number, changeLogPath, versionPattern, enforcedSectionVersion)
+            await validateSectionModified(token, repository, pullRequest.number, changeLogPath, versionPattern, enforcedSectionVersion, changelog.contents_url)
         }
 
         if (shouldEnforceVersion(expectedLatestVersion)) {
@@ -127,7 +127,7 @@ async function validateLatestVersion(token, expectedLatestVersion, versionPatter
     }
 }
 
-async function validateSectionModified(token, repository, pullRequestNumber, changeLogPath, versionPattern, enforcedSectionVersion) {
+async function validateSectionModified(token, repository, pullRequestNumber, changeLogPath, versionPattern, enforcedSectionVersion, changelogContentsUrl) {
     const normalizedChangeLogPath = normalizeChangelogPath(changeLogPath)
     const diff = await downloadFileDiff(token, repository, pullRequestNumber, normalizedChangeLogPath)
     if (!diff) {
@@ -142,8 +142,29 @@ async function validateSectionModified(token, repository, pullRequestNumber, cha
         return
     }
 
-    const isModified = sectionExtractor.isSectionModified(versionPattern, enforcedSectionVersion, diff)
-    if (!isModified) {
-        throw new Error(`The "${enforcedSectionVersion}" section in ${changeLogPath} was not modified!`)
+    // Primary check: look for added lines within the section in the visible patch.
+    if (sectionExtractor.isSectionModified(versionPattern, enforcedSectionVersion, diff)) {
+        return
     }
+
+    // Secondary check: the section header may not be visible in the patch when the
+    // change is more than ~3 context lines away from the header (common in long sections).
+    // Fall back to matching added line numbers against the section's line range in the full file.
+    if (changelogContentsUrl) {
+        core.debug(`Section header not visible in patch — falling back to line-number check`)
+        const fullContent = await downloadChangelog(token, changelogContentsUrl)
+        const sectionRange = sectionExtractor.findSectionLineRange(versionPattern, enforcedSectionVersion, fullContent)
+        if (sectionRange) {
+            const addedLines = sectionExtractor.getAddedLineNumbers(diff)
+            const hasAddedLineInSection = [...addedLines].some(
+                line => line >= sectionRange.start && line < sectionRange.end
+            )
+            if (hasAddedLineInSection) {
+                core.debug(`Found added content in section "${enforcedSectionVersion}" via line-number fallback`)
+                return
+            }
+        }
+    }
+
+    throw new Error(`The "${enforcedSectionVersion}" section in ${changeLogPath} was not modified!`)
 }

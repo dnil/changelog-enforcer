@@ -108,3 +108,73 @@ module.exports.isSectionModified = function (versionPattern, sectionVersion, dif
 
     return hasAddedContent
 }
+
+/**
+ * Finds the 1-based line range of a specific section in the full changelog content.
+ * Useful when the section header isn't visible in the patch (change is far from header).
+ *
+ * @param {string} versionPattern - Regex pattern to match any version header
+ * @param {string} sectionVersion - The specific version/section to find
+ * @param {string} content - The full changelog file content
+ * @returns {{start: number, end: number}|null} 1-based start (inclusive) and end (exclusive) line numbers, or null if not found
+ */
+module.exports.findSectionLineRange = function (versionPattern, sectionVersion, content) {
+    const lines = content.split('\n')
+    const escapedVersion = sectionVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const targetHeaderPattern = new RegExp(`^## \\[${escapedVersion}\\]`, 'i')
+    const anyHeaderPattern = new RegExp(versionPattern, 'im')
+
+    let start = -1
+    for (let i = 0; i < lines.length; i++) {
+        if (start === -1) {
+            if (targetHeaderPattern.test(lines[i])) {
+                start = i + 1 // 1-based, inclusive
+            }
+        } else {
+            if (anyHeaderPattern.test(lines[i])) {
+                return { start, end: i + 1 } // end is exclusive (1-based line of next header)
+            }
+        }
+    }
+    if (start !== -1) {
+        return { start, end: lines.length + 1 }
+    }
+    return null
+}
+
+/**
+ * Parses a patch string and returns the set of new-file line numbers that have added lines.
+ * Uses the @@ -a,b +c,d @@ hunk headers to track line positions.
+ *
+ * @param {string} patch - The patch content (from GitHub API or full diff)
+ * @returns {Set<number>} Set of 1-based line numbers in the new file that were added
+ */
+module.exports.getAddedLineNumbers = function (patch) {
+    const lines = patch.split('\n')
+    const addedLines = new Set()
+    let newLineNum = 0
+
+    for (const line of lines) {
+        const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+        if (hunkMatch) {
+            newLineNum = parseInt(hunkMatch[1], 10)
+            continue
+        }
+        // Skip diff file headers — they don't affect line numbers
+        if (line.startsWith('+++') || line.startsWith('---') ||
+            line.startsWith('diff ') || line.startsWith('index ')) {
+            continue
+        }
+        if (line.startsWith('+')) {
+            addedLines.add(newLineNum)
+            newLineNum++
+        } else if (line.startsWith('-')) {
+            // Removed line: doesn't advance new-file counter
+        } else {
+            // Context line
+            newLineNum++
+        }
+    }
+
+    return addedLines
+}

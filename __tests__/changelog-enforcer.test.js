@@ -315,20 +315,91 @@ describe('the changelog-enforcer', () => {
        })
    })
 
-   it('should fail when enforcedSectionVersion is set and section is not modified', (done) => {
+   it('should enforce section when change is far from section header (line-number fallback)', (done) => {
      inputs['skipLabels'] = 'A different label'
      inputs['enforcedSectionVersion'] = 'unreleased'
+
+     const contentsUrl = 'https://api.github.com/repos/repo/contents/CHANGELOG.md'
+
+     // Patch where the section header is NOT visible — change is deep inside a long Unreleased section
+     const patch = [
+       '@@ -20,5 +20,6 @@',
+       ' - Previous feature 15',
+       ' - Previous feature 16',
+       '+- New feature added deep in the section',
+       ' - Previous feature 17',
+       ' - Previous feature 18'
+     ].join('\n')
+
+     // Full changelog — Unreleased section covers lines 1–22, v1.0.0 starts at line 23
+     const fullChangelog = [
+       '## [Unreleased]',           // line 1
+       '- Previous feature 1',
+       '- Previous feature 2',
+       '- Previous feature 3',
+       '- Previous feature 4',
+       '- Previous feature 5',
+       '- Previous feature 6',
+       '- Previous feature 7',
+       '- Previous feature 8',
+       '- Previous feature 9',
+       '- Previous feature 10',
+       '- Previous feature 11',
+       '- Previous feature 12',
+       '- Previous feature 13',
+       '- Previous feature 14',
+       '- Previous feature 15',
+       '- Previous feature 16',
+       '- New feature added deep in the section',
+       '- Previous feature 17',
+       '- Previous feature 18',
+       '',
+       '',
+       '## [v1.0.0]',               // line 23
+       '- Initial release'
+     ].join('\n')
 
      const files = [
        {
          "filename": "CHANGELOG.md",
          "status": "modified",
-         "contents_url": "./path/to/CHANGELOG.md",
+         "contents_url": contentsUrl,
+         "patch": patch
+       }
+     ]
+
+     fetch.mockImplementation((url) => {
+       if (url === contentsUrl) {
+         return Promise.resolve(new Response(fullChangelog))
+       }
+       return prepareResponse(JSON.stringify(files))
+     })
+
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(failureSpy).not.toHaveBeenCalled()
+         expect(infoSpy).toHaveBeenCalledWith('✅ Changelog section updated')
+         // findChangelog + downloadFileDiff + downloadChangelog (fallback)
+         expect(fetch).toHaveBeenCalledTimes(3)
+         done()
+       })
+       .catch(done)
+   })
+
+   it('should fail when enforcedSectionVersion is set and section is not modified', (done) => {
+     inputs['skipLabels'] = 'A different label'
+     inputs['enforcedSectionVersion'] = 'unreleased'
+
+     const contentsUrl = 'https://api.github.com/repos/repo/contents/CHANGELOG.md'
+
+     // Patch: Unreleased section header IS visible, but the added lines are under v1.0.0
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": contentsUrl,
            "patch": [
-             'diff --git a/CHANGELOG.md b/CHANGELOG.md',
-             '--- a/CHANGELOG.md',
-             '+++ b/CHANGELOG.md',
-             '@@ -1,3 +1,5 @@',
+             '@@ -1,5 +1,7 @@',
              ' ## [Unreleased]',
              ' ',
              ' ## [v1.0.0]',
@@ -339,7 +410,23 @@ describe('the changelog-enforcer', () => {
        }
      ]
 
-      fetch.mockImplementation(() => prepareResponse(JSON.stringify(files)))
+     // Full file: Unreleased section is lines 1-2 (header + blank), v1.0.0 starts at line 3
+     // Added lines from patch are at new-file lines 4 and 5 — outside Unreleased range
+     const fullChangelog = [
+       '## [Unreleased]',
+       '',
+       '## [v1.0.0]',
+       '- Fixed bug',
+       '',
+       '- Initial release'
+     ].join('\n')
+
+     fetch.mockImplementation((url) => {
+       if (url === contentsUrl) {
+         return Promise.resolve(new Response(fullChangelog))
+       }
+       return prepareResponse(JSON.stringify(files))
+     })
 
      changelogEnforcer.enforce()
        .then(() => {
@@ -347,7 +434,8 @@ describe('the changelog-enforcer', () => {
          expect(failureSpy).toHaveBeenCalled()
          expect(outputSpy).toHaveBeenCalled()
 
-           expect(fetch).toHaveBeenCalledTimes(2)
+         // findChangelog + downloadFileDiff + downloadChangelog (line-number fallback)
+         expect(fetch).toHaveBeenCalledTimes(3)
 
          done()
        })
