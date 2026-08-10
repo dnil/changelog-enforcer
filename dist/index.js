@@ -33935,7 +33935,7 @@ module.exports.enforce = async function () {
 
         // Check enforced section if specified
         if (enforcedSectionVersion !== '') {
-            await validateSectionModified(token, repository, pullRequest.number, changeLogPath, versionPattern, enforcedSectionVersion)
+            await validateSectionModified(token, repository, pullRequest.number, changeLogPath, versionPattern, enforcedSectionVersion, changelog.contents_url)
         }
 
         if (shouldEnforceVersion(expectedLatestVersion)) {
@@ -34011,7 +34011,7 @@ async function validateLatestVersion(token, expectedLatestVersion, versionPatter
     }
 }
 
-async function validateSectionModified(token, repository, pullRequestNumber, changeLogPath, versionPattern, enforcedSectionVersion) {
+async function validateSectionModified(token, repository, pullRequestNumber, changeLogPath, versionPattern, enforcedSectionVersion, changelogContentsUrl) {
     const normalizedChangeLogPath = normalizeChangelogPath(changeLogPath)
     const diff = await downloadFileDiff(token, repository, pullRequestNumber, normalizedChangeLogPath)
     if (!diff) {
@@ -34026,10 +34026,31 @@ async function validateSectionModified(token, repository, pullRequestNumber, cha
         return
     }
 
-    const isModified = sectionExtractor.isSectionModified(versionPattern, enforcedSectionVersion, diff)
-    if (!isModified) {
-        throw new Error(`The "${enforcedSectionVersion}" section in ${changeLogPath} was not modified!`)
+    // Primary check: look for added lines within the section in the visible patch.
+    if (sectionExtractor.isSectionModified(versionPattern, enforcedSectionVersion, diff)) {
+        return
     }
+
+    // Secondary check: the section header may not be visible in the patch when the
+    // change is more than ~3 context lines away from the header (common in long sections).
+    // Fall back to matching added line numbers against the section's line range in the full file.
+    if (changelogContentsUrl) {
+        core.debug(`Section header not visible in patch — falling back to line-number check`)
+        const fullContent = await downloadChangelog(token, changelogContentsUrl)
+        const sectionRange = sectionExtractor.findSectionLineRange(versionPattern, enforcedSectionVersion, fullContent)
+        if (sectionRange) {
+            const addedLines = sectionExtractor.getAddedLineNumbers(diff)
+            const hasAddedLineInSection = [...addedLines].some(
+                line => line >= sectionRange.start && line < sectionRange.end
+            )
+            if (hasAddedLineInSection) {
+                core.debug(`Found added content in section "${enforcedSectionVersion}" via line-number fallback`)
+                return
+            }
+        }
+    }
+
+    throw new Error(`The "${enforcedSectionVersion}" section in ${changeLogPath} was not modified!`)
 }
 
 
@@ -34295,6 +34316,101 @@ module.exports.isSectionModified = function (versionPattern, sectionVersion, dif
     }
 
     return hasAddedContent
+}
+
+/**
+ * Finds the 1-based line range of a specific section in the full changelog content.
+ * Useful when the section header isn't visible in the patch (change is far from header).
+ *
+ * @param {string} versionPattern - Regex pattern to match any version header
+ * @param {string} sectionVersion - The specific version/section to find
+ * @param {string} content - The full changelog file content
+ * @returns {{start: number, end: number}|null} 1-based start (inclusive) and end (exclusive) line numbers, or null if not found
+ */
+module.exports.findSectionLineRange = function (versionPattern, sectionVersion, content) {
+    const lines = content.split('\n')
+    const escapedVersion = sectionVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+    // Support both "## [Version]" and "[Version]" style section headers.
+    const targetHeaderPatterns = [
+        new RegExp(`^## \\[${escapedVersion}\\]`, 'i'),
+        new RegExp(`^\\[${escapedVersion}\\]`, 'i')
+    ]
+
+    let anyHeaderPattern
+    try {
+        anyHeaderPattern = new RegExp(versionPattern, 'im')
+    } catch (err) {
+        anyHeaderPattern = null
+    }
+
+    // Generic section-header fallback: bracketed version token at start of line,
+    // optionally prefixed by markdown heading hashes.
+    const genericHeaderPattern = /^#{0,6}\s*\[[^\]]+\]/i
+
+    let start = -1
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        const isTargetHeader = targetHeaderPatterns.some(pattern => pattern.test(line))
+
+        if (start === -1) {
+            if (isTargetHeader) {
+                start = i + 1 // 1-based, inclusive
+            }
+            continue
+        }
+
+        const isVersionHeader = anyHeaderPattern ? anyHeaderPattern.test(line) : false
+        const isGenericHeader = genericHeaderPattern.test(line)
+        if (isVersionHeader || isGenericHeader) {
+            // If we encounter the same target header with different casing, stay in section.
+            if (!isTargetHeader) {
+                return { start, end: i + 1 } // end is exclusive
+            }
+        }
+    }
+
+    if (start !== -1) {
+        return { start, end: lines.length + 1 }
+    }
+    return null
+}
+
+/**
+ * Parses a patch string and returns the set of new-file line numbers that have added lines.
+ * Uses the @@ -a,b +c,d @@ hunk headers to track line positions.
+ *
+ * @param {string} patch - The patch content (from GitHub API or full diff)
+ * @returns {Set<number>} Set of 1-based line numbers in the new file that were added
+ */
+module.exports.getAddedLineNumbers = function (patch) {
+    const lines = patch.split('\n')
+    const addedLines = new Set()
+    let newLineNum = 0
+
+    for (const line of lines) {
+        const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+        if (hunkMatch) {
+            newLineNum = parseInt(hunkMatch[1], 10)
+            continue
+        }
+        // Skip diff file headers — they don't affect line numbers
+        if (line.startsWith('+++') || line.startsWith('---') ||
+            line.startsWith('diff ') || line.startsWith('index ')) {
+            continue
+        }
+        if (line.startsWith('+')) {
+            addedLines.add(newLineNum)
+            newLineNum++
+        } else if (line.startsWith('-')) {
+            // Removed line: doesn't advance new-file counter
+        } else {
+            // Context line
+            newLineNum++
+        }
+    }
+
+    return addedLines
 }
 
 

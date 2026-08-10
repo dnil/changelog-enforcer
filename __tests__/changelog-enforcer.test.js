@@ -386,6 +386,66 @@ describe('the changelog-enforcer', () => {
        .catch(done)
    })
 
+   it('should enforce section when patch omits header and changelog uses bracket-only unreleased header', (done) => {
+     inputs['skipLabels'] = 'A different label'
+     inputs['enforcedSectionVersion'] = 'unreleased'
+
+     const contentsUrl = 'https://api.github.com/repos/repo/contents/CHANGELOG.md'
+
+     const patch = [
+       '@@ -9,6 +9,7 @@ About changelog [here](https://keepachangelog.com/en/1.0.0/)',
+       ' - Changelog enforcement specific to the `unreleased` changelog section (#6216)',
+       ' ### Fixed',
+       ' - Bug calculating allele read depth in samples genotype module (#6469)',
+       '+- Users selecting no institute on gene variants page should only see cases they have access to (#6476)'
+     ].join('\n')
+
+     const fullChangelog = [
+       '# CHANGELOG',
+       '',
+       'About changelog [here](https://keepachangelog.com/en/1.0.0/)',
+       '',
+       '[unreleased]',
+       '### Changed',
+       '- Changelog enforcement specific to the `unreleased` changelog section (#6216)',
+       '- Related item 1',
+       '- Related item 2',
+       '### Fixed',
+       '- Bug calculating allele read depth in samples genotype module (#6469)',
+       '- Users selecting no institute on gene variants page should only see cases they have access to (#6476)',
+       '- Another fix in unreleased',
+       '- Yet another fix in unreleased',
+       '',
+       '[1.2.3]',
+       '- Previous release notes'
+     ].join('\n')
+
+     const files = [
+       {
+         "filename": "CHANGELOG.md",
+         "status": "modified",
+         "contents_url": contentsUrl,
+         "patch": patch
+       }
+     ]
+
+     fetch.mockImplementation((url) => {
+       if (url === contentsUrl) {
+         return Promise.resolve(new Response(fullChangelog))
+       }
+       return prepareResponse(JSON.stringify(files))
+     })
+
+     changelogEnforcer.enforce()
+       .then(() => {
+         expect(failureSpy).not.toHaveBeenCalled()
+         expect(infoSpy).toHaveBeenCalledWith('✅ Changelog section updated')
+         expect(fetch).toHaveBeenCalledTimes(3)
+         done()
+       })
+       .catch(done)
+   })
+
    it('should fail when enforcedSectionVersion is set and section is not modified', (done) => {
      inputs['skipLabels'] = 'A different label'
      inputs['enforcedSectionVersion'] = 'unreleased'

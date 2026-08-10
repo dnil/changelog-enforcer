@@ -121,21 +121,46 @@ module.exports.isSectionModified = function (versionPattern, sectionVersion, dif
 module.exports.findSectionLineRange = function (versionPattern, sectionVersion, content) {
     const lines = content.split('\n')
     const escapedVersion = sectionVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const targetHeaderPattern = new RegExp(`^## \\[${escapedVersion}\\]`, 'i')
-    const anyHeaderPattern = new RegExp(versionPattern, 'im')
+
+    // Support both "## [Version]" and "[Version]" style section headers.
+    const targetHeaderPatterns = [
+        new RegExp(`^## \\[${escapedVersion}\\]`, 'i'),
+        new RegExp(`^\\[${escapedVersion}\\]`, 'i')
+    ]
+
+    let anyHeaderPattern
+    try {
+        anyHeaderPattern = new RegExp(versionPattern, 'im')
+    } catch (err) {
+        anyHeaderPattern = null
+    }
+
+    // Generic section-header fallback: bracketed version token at start of line,
+    // optionally prefixed by markdown heading hashes.
+    const genericHeaderPattern = /^#{0,6}\s*\[[^\]]+\]/i
 
     let start = -1
     for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        const isTargetHeader = targetHeaderPatterns.some(pattern => pattern.test(line))
+
         if (start === -1) {
-            if (targetHeaderPattern.test(lines[i])) {
+            if (isTargetHeader) {
                 start = i + 1 // 1-based, inclusive
             }
-        } else {
-            if (anyHeaderPattern.test(lines[i])) {
-                return { start, end: i + 1 } // end is exclusive (1-based line of next header)
+            continue
+        }
+
+        const isVersionHeader = anyHeaderPattern ? anyHeaderPattern.test(line) : false
+        const isGenericHeader = genericHeaderPattern.test(line)
+        if (isVersionHeader || isGenericHeader) {
+            // If we encounter the same target header with different casing, stay in section.
+            if (!isTargetHeader) {
+                return { start, end: i + 1 } // end is exclusive
             }
         }
     }
+
     if (start !== -1) {
         return { start, end: lines.length + 1 }
     }

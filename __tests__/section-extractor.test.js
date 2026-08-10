@@ -268,6 +268,35 @@ index 1234567..abcdefg 100644
       expect(range).not.toBeNull()
       expect(range.start).toBe(1)
     })
+
+    it('should support bracket-only section headers without markdown hashes', () => {
+      const content = `[unreleased]
+### Changed
+- New change
+
+[1.2.3]
+- Older release
+`
+      const range = sectionExtractor.findSectionLineRange(versionPattern, 'unreleased', content)
+      expect(range).not.toBeNull()
+      expect(range.start).toBe(1)
+      expect(range.end).toBe(5)
+    })
+
+    it('should support bracket-only headers for middle sections', () => {
+      const content = `[2.0.0]
+- Top
+
+[unreleased]
+- Middle change
+
+[1.0.0]
+- Bottom`
+      const range = sectionExtractor.findSectionLineRange(versionPattern, 'unreleased', content)
+      expect(range).not.toBeNull()
+      expect(range.start).toBe(4)
+      expect(range.end).toBe(7)
+    })
   })
 
   describe('getAddedLineNumbers', () => {
